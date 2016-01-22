@@ -1,0 +1,19 @@
+*** /etc/php.ini.orig   2014-10-31 05:17:41.000000000 +0900
+--- /etc/php.ini        2015-05-20 19:31:06.424520153 +0900
+***************
+*** 943,949 ****
+  [Date]
+  ; Defines the default timezone used by the date functions
+  ; http://www.php.net/manual/en/datetime.configuration.php#ini.date.timezone
+! ;date.timezone =
+
+  ; http://www.php.net/manual/en/datetime.configuration.php#ini.date.default-latitude
+  ;date.default_latitude = 31.7667
+--- 943,949 ----
+  [Date]
+  ; Defines the default timezone used by the date functions
+  ; http://www.php.net/manual/en/datetime.configuration.php#ini.date.timezone
+! date.timezone = Asia/Tokyo
+
+  ; http://www.php.net/manual/en/datetime.configuration.php#ini.date.default-latitude
+  ;date.default_latitude = 31.7667

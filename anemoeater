@@ -1,0 +1,202 @@
+#!/usr/bin/perl
+
+########################################################################
+# Copyright (C) 2016  yoku0825
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+########################################################################
+
+use strict;
+use warnings;
+use utf8;
+
+use FindBin qw/$Bin/;
+use DBI;
+use Parallel::ForkManager;
+use Getopt::Long qw/:config posix_default bundling no_ignore_case gnu_compat/;
+
+usage("/usr/bin/pt-query-digest isn't executable .") unless -x "/usr/bin/pt-query-digest";
+
+my $opt= {parallel => 2,
+          since    => 0,
+          until    => 999912312359,
+          report   => 100,
+          help     => 0,
+          docker   => 1,
+          local    => 0,
+         };
+GetOptions($opt, qw/socket=s host=s port=i user=s password=s
+                    parallel=i since=s until=s report=i cell=i
+                    help no-docker local/) or die;
+usage() if $opt->{help};
+$opt->{docker}= 0 if $opt->{"no-docker"};
+
+usage("Too many arguments.") if $#ARGV > 1;
+my $file= $ARGV[0];
+usage("Slow log $file can't read.") unless -r $file;
+
+### Starting docker container.
+if ($opt->{docker})
+{
+  my $repository;
+  if ($opt->{local})
+  {
+    $repository= "anemoeater";
+    system("sudo docker build -t anemoeater $Bin");
+  }
+  else
+  {
+    $repository= "yoku0825/anemometer";
+  }
+
+  my $container_id= `sudo docker run -d -P $repository`;
+  chomp($container_id);
+
+  my $container_ipaddr= `sudo docker inspect -f '{{.NetworkSettings.IPAddress}}' $container_id`;
+  chomp($container_ipaddr);
+
+  my $publish_port= `sudo docker inspect $container_id | awk '/HostPort/{print \$2}' | tr -d \\"`;
+  chomp($publish_port);
+
+  ### wait container's mysqld starts to run
+  while ()
+  {
+    eval
+    {
+      my $conn= DBI->connect("dbi:mysql:;host=$container_ipaddr", "anemometer", "",
+                             {RaiseError => 1, PrintError => 0});
+      $conn->do("SELECT CURRENT_USER()");
+    };
+
+    last unless $@;
+    sleep 3;
+  }
+
+  $opt->{host}    = $container_ipaddr;
+  $opt->{user}    = "anemometer";
+  $opt->{password}= undef;
+  $opt->{port}    = undef;
+
+  printf("Docker container starts with $container_ipaddr.\n");
+  printf("URL will be http://$ENV{HOSTNAME}:$publish_port/anemometer\n");
+}
+
+my $pt_dsn= "D=slow_query_log";
+$pt_dsn  .= sprintf(",h=%s", $opt->{host})     if $opt->{host};
+$pt_dsn  .= sprintf(",P=%d", $opt->{port})     if $opt->{port};
+$pt_dsn  .= sprintf(",u=%s", $opt->{user})     if $opt->{user};
+$pt_dsn  .= sprintf(",p=%s", $opt->{password}) if $opt->{password};
+
+my $cmd_format= qq{| /usr/bin/pt-query-digest --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
+
+my $pm  = Parallel::ForkManager->new($opt->{parallel});
+open(my $in, "<", $file);
+
+my $event  = 0;
+my $time   = 0;
+my $timetmp= 0;
+my @buffer = ();
+while (<$in>)
+{
+  if (/^# Time: (?<timestr>.+)$/)
+  {
+    if ($+{timestr} =~ /(?<year>\d{2})(?<month>\d{2})(?<day>\d{2})\s+
+                        (?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})/x)
+    {
+      ### 5.0, 5.1, 5.5, 5.6 style.
+      # "# Time: %02d%02d%02d %2d:%02d:%02d\n",
+
+      ### normalize without seconds.
+      $timetmp= sprintf("20%02d%02d%02d%02d%02d",
+                        $+{year}, $+{month}, $+{day},
+                        $+{hour}, $+{minute});
+    }
+    elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
+                           (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.
+                           (?<fraction>\d{6})(?<timezone>.*)/x)
+    {
+      ### 5.7 style.
+      # "%04d-%02d-%02dT%02d:%02d:%02d.%06lu%s",
+ 
+      ### normalize without seconds.
+      $timetmp= sprintf("%04d%02d%02d%02d%02d",
+                        $+{year}, $+{month}, $+{day},
+                        $+{hour}, $+{minute});
+    }
+    else
+    {
+      ### Unknown format.
+      $timetmp= 0;
+    }
+
+    if ($timetmp != $time)
+    {
+      &send_pt_qd if ($opt->{since} <= $time && $time <= $opt->{until});
+      $time= $timetmp;
+      @buffer= ();
+    }
+  }
+  push(@buffer, $_);
+}
+
+### flush last block.
+&send_pt_qd if (@buffer && $opt->{since} <= $time && $time <= $opt->{until});
+
+$pm->wait_all_children;
+
+exit 0;
+
+
+sub usage
+{
+  my ($msg)= @_;
+
+  print $msg, "\n" if $msg;
+  print << "EOF";
+$0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
+   [--parallel=i] [--since=i] [--until=i] [--report=i] [--docker] path_to_slowlog
+  $0 is split slowlog and process by pt-query-digest.
+
+  --user=s     MySQL user which pt-query-digest uses to connection.
+  --password=s MySQL password which pt-query-digest uses to connection.
+  --port=i     MySQL port which pt-query-digest uses to connection.
+  --host=s     MySQL host which pt-query-digest uses to connection.
+  --socket=s   MySQL socket which pt-query-digest uses to connection.
+  --parallel=i How many processes does script run concurrently.
+  --since=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
+  --until=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
+  --report=i   Print message each processed events n times.
+  --docker     Using docker container (yoku0825/anemometer)
+  --local      Using docker container but using local built.
+EOF
+  exit 0;
+}
+
+
+sub send_pt_qd
+{
+  printf("processing %dth event.\n", $event) if ($opt->{report} && (++$event % $opt->{report}) == 0);
+
+  unless ($pm->start)
+  {
+    open(my $process, sprintf($cmd_format,
+                              $pt_dsn . ",t=global_query_review",
+                              $pt_dsn . ",t=global_query_review_history",
+                              $ENV{HOSTNAME}));
+    print $process @buffer;
+    close($process);
+    $pm->finish;
+  }
+} 
