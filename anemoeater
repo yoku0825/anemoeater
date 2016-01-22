@@ -33,6 +33,7 @@ my $opt= {parallel => 2,
           since    => 0,
           until    => 999912312359,
           report   => 100,
+          cell     => 1,
           help     => 0,
           docker   => 1,
           local    => 0,
@@ -46,6 +47,8 @@ $opt->{docker}= 0 if $opt->{"no-docker"};
 usage("Too many arguments.") if $#ARGV > 1;
 my $file= $ARGV[0];
 usage("Slow log $file can't read.") unless -r $file;
+
+usage("--cell should not be 0") unless $opt->{cell};
 
 ### Starting docker container.
 if ($opt->{docker})
@@ -121,7 +124,7 @@ while (<$in>)
       ### normalize without seconds.
       $timetmp= sprintf("20%02d%02d%02d%02d%02d",
                         $+{year}, $+{month}, $+{day},
-                        $+{hour}, $+{minute});
+                        $+{hour}, int($+{minute} / $opt->{cell}) * $opt->{cell});
     }
     elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
                            (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.
@@ -133,7 +136,7 @@ while (<$in>)
       ### normalize without seconds.
       $timetmp= sprintf("%04d%02d%02d%02d%02d",
                         $+{year}, $+{month}, $+{day},
-                        $+{hour}, $+{minute});
+                        $+{hour}, int($+{minute} / $opt->{cell}) * $opt->{cell});
     }
     else
     {
