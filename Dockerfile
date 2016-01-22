@@ -8,7 +8,7 @@ RUN git clone https://github.com/yoku0825/init_script.git /tmp/setup/init_script
 RUN bash /tmp/setup/init_script.git/docker/docker_basic.sh
 
 RUN yum install -y http://www.percona.com/downloads/percona-release/percona-release-0.0-1.x86_64.rpm
-RUN yum install -y Percona-Server-client-56 Percona-Server-shared-56 Percona-Server-server-56 percona-toolkit
+RUN yum install -y Percona-Server-client-56 Percona-Server-shared-56 Percona-Server-server-56
 RUN yum install -y httpd php php-mysql php-bcmath
 
 RUN git clone https://github.com/box/Anemometer.git /var/www/html/anemometer
