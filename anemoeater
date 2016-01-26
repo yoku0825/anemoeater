@@ -40,8 +40,8 @@ my $opt= {parallel => 2,
          };
 GetOptions($opt, qw/socket=s host=s port=i user=s password=s
                     parallel=i since=s until=s report=i cell=i
-                    help no-docker local/) or die;
-usage() if $opt->{help};
+                    help usage no-docker local/) or die;
+usage() if $opt->{help} || $opt->{usage};
 $opt->{docker}= 0 if $opt->{"no-docker"};
 
 usage("Too many arguments.") if $#ARGV > 1;
@@ -169,7 +169,8 @@ sub usage
   print $msg, "\n" if $msg;
   print << "EOF";
 $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
-   [--parallel=i] [--since=i] [--until=i] [--report=i] [--docker] path_to_slowlog
+   [--parallel=i] [--since=i] [--until=i] [--report=i] [--docker] slowlog
+
   $0 is split slowlog and process by pt-query-digest.
 
   --user=s     MySQL user which pt-query-digest uses to connection.
@@ -177,12 +178,12 @@ $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
   --port=i     MySQL port which pt-query-digest uses to connection.
   --host=s     MySQL host which pt-query-digest uses to connection.
   --socket=s   MySQL socket which pt-query-digest uses to connection.
-  --parallel=i How many processes does script run concurrently.
+  --parallel=i How many processes does script run concurrently (default: 2)
   --since=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
   --until=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
-  --report=i   Print message each processed events n times.
-  --docker     Using docker container (yoku0825/anemometer)
-  --local      Using docker container but using local built.
+  --report=i   Print message each processed events n times (default: 100)
+  --no-docker  Do not use docker image. Must specify --user, --password, --port and --host.
+  --local      Using docker container but using local built(Do not use yoku0825/anemoeater)
 EOF
   exit 0;
 }
@@ -190,7 +191,7 @@ EOF
 
 sub send_pt_qd
 {
-  printf("processing %dth event.\n", $event) if ($opt->{report} && (++$event % $opt->{report}) == 0);
+  printf("processing %s.\n", $time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
 
   unless ($pm->start)
   {
