@@ -215,7 +215,8 @@ EOF
 sub send_pt_qd
 {
   return 0 unless ($since <= $current_time && $current_time <= $until);
-  printf("processing %s.\n", $current_time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
+  printf("processing %s %s.\n", $current_time->ymd, $current_time->hms)
+    if ($opt->{report} && (++$event % $opt->{report}) == 0);
 
   unless ($pm->start)
   {
