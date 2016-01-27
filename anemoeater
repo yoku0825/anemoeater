@@ -61,7 +61,7 @@ if ($opt->{docker})
   }
   else
   {
-    $repository= "yoku0825/anemometer";
+    $repository= "yoku0825/anemoeater";
   }
 
   my $container_id= `sudo docker run -d -P $repository`;
