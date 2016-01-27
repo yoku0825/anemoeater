@@ -23,15 +23,26 @@ use warnings;
 use utf8;
 
 use FindBin qw/$Bin/;
+use Time::Piece;
 use DBI;
 use Parallel::ForkManager;
 use Getopt::Long qw/:config posix_default bundling no_ignore_case gnu_compat/;
 
+use constant TIME_FORMAT => ["%Y/%m/%d %H:%M:%S",
+                             "%Y/%m/%d %H:%M",
+                             "%Y/%m/%d",
+                             "%Y-%m-%d %H:%M:%S",
+                             "%Y-%m-%d %H:%M",
+                             "%Y-%m-%d",
+                             "%Y%m%d%H%M%S",
+                             "%Y%m%d%H%M",
+                             "%Y%m%d"];
+
 usage("/usr/bin/pt-query-digest isn't executable .") unless -x "/usr/bin/pt-query-digest";
 
 my $opt= {parallel => 2,
-          since    => 0,
-          until    => 999912312359,
+          since    => "1970/1/1",
+          until    => "9999/12/31",
           report   => 100,
           cell     => 1,
           help     => 0,
@@ -49,6 +60,14 @@ my $file= $ARGV[0];
 usage("Slow log $file can't read.") unless -r $file;
 
 usage("--cell should not be 0") unless $opt->{cell};
+
+my $since= parse_time($opt->{since}, &TIME_FORMAT);
+usage("Can't parse --since") unless $since;
+
+my $until= parse_time($opt->{until}, &TIME_FORMAT);
+usage("Can't parse --until") unless $until;
+
+
 
 ### Starting docker container.
 if ($opt->{docker})
@@ -108,8 +127,9 @@ my $pm  = Parallel::ForkManager->new($opt->{parallel});
 open(my $in, "<", $file);
 
 my $event  = 0;
-my $time   = 0;
 my $timetmp= 0;
+my $current_time;
+my $previous_time;
 my @buffer = ();
 while (<$in>)
 {
@@ -124,7 +144,8 @@ while (<$in>)
       ### normalize without seconds.
       $timetmp= sprintf("20%02d%02d%02d%02d%02d",
                         $+{year}, $+{month}, $+{day},
-                        $+{hour}, int($+{minute} / $opt->{cell}) * $opt->{cell});
+                        $+{hour}, $+{minute}, $+{second});
+
     }
     elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
                            (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.
@@ -136,7 +157,7 @@ while (<$in>)
       ### normalize without seconds.
       $timetmp= sprintf("%04d%02d%02d%02d%02d",
                         $+{year}, $+{month}, $+{day},
-                        $+{hour}, int($+{minute} / $opt->{cell}) * $opt->{cell});
+                        $+{hour}, $+{minute}, $+{second});
     }
     else
     {
@@ -144,10 +165,12 @@ while (<$in>)
       $timetmp= 0;
     }
 
-    if ($timetmp != $time)
+    $current_time= Time::Piece->strptime($timetmp, "%Y%m%d%H%M%S");
+
+    if (!($previous_time) || ($current_time - $previous_time) >= ($opt->{cell} * 60))
     {
-      &send_pt_qd if ($opt->{since} <= $time && $time <= $opt->{until});
-      $time= $timetmp;
+      &send_pt_qd;
+      $previous_time= $current_time;
       @buffer= ();
     }
   }
@@ -155,7 +178,7 @@ while (<$in>)
 }
 
 ### flush last block.
-&send_pt_qd if (@buffer && $opt->{since} <= $time && $time <= $opt->{until});
+&send_pt_qd if @buffer;
 
 $pm->wait_all_children;
 
@@ -191,7 +214,8 @@ EOF
 
 sub send_pt_qd
 {
-  printf("processing %s.\n", $time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
+  return 0 unless ($since <= $current_time && $current_time <= $until);
+  printf("processing %s.\n", $current_time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
 
   unless ($pm->start)
   {
@@ -204,3 +228,23 @@ sub send_pt_qd
     $pm->finish;
   }
 } 
+
+
+
+sub parse_time
+{
+  my ($timestr, $candidate)= @_;
+  my $ret;
+
+  foreach (@$candidate)
+  {
+    eval
+    {
+      $ret= Time::Piece->strptime($timestr, $_);
+    };
+
+    return $ret unless $@;
+  }
+}
+
+
