@@ -124,11 +124,11 @@ $pt_dsn  .= sprintf(",p=%s", $opt->{password}) if $opt->{password};
 my $cmd_format= qq{| /usr/bin/pt-query-digest --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
 
 
+my $pm  = Parallel::ForkManager->new($opt->{parallel});
+
 foreach my $file (@files)
 {
   open(my $in, "<", $file);
-  
-  my $pm  = Parallel::ForkManager->new($opt->{parallel});
 
   my $event  = 0;
   my $timetmp= 0;
@@ -173,7 +173,7 @@ foreach my $file (@files)
   
       if (!($previous_time) || ($current_time - $previous_time) >= ($opt->{cell} * 60))
       {
-        &send_pt_qd;
+        $event= &send_pt_qd($current_time, $event, $file, @buffer);
         $previous_time= $current_time;
         @buffer= ();
       }
@@ -182,7 +182,7 @@ foreach my $file (@files)
   }
   
   ### flush last block.
-  &send_pt_qd if @buffer;
+  &send_pt_qd($current_time, $event, $file, @buffer) if @buffer;
   
   $pm->wait_all_children;
   
@@ -195,26 +195,10 @@ foreach my $file (@files)
   my $password= $opt->{password} ? $opt->{password} : "";
   
   my $conn= DBI->connect($dsn, $user, $password, {mysql_use_utf8 => 1});
-  $conn->do("UPDATE global_query_review_history SET hostname_max= ? WHERE hostname_max= ?",
+  $conn->do("UPDATE global_query_review_history SET hostname_max= REPLACE(?, '.log', '') WHERE hostname_max= ?",
             undef,
             basename($file), $ENV{HOSTNAME});
 
-  sub send_pt_qd
-  {
-    return 0 unless ($since <= $current_time && $current_time <= $until);
-    printf("processing %s.\n", $current_time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
-  
-    unless ($pm->start)
-    {
-      open(my $process, sprintf($cmd_format,
-                                $pt_dsn . ",t=global_query_review",
-                                $pt_dsn . ",t=global_query_review_history",
-                                $ENV{HOSTNAME}));
-      print $process @buffer;
-      close($process);
-      $pm->finish;
-    }
-  }
 } 
 
 
@@ -248,8 +232,6 @@ EOF
 }
 
 
-
-
 sub parse_time
 {
   my ($timestr, $candidate)= @_;
@@ -265,4 +247,27 @@ sub parse_time
     return $ret unless $@;
   }
 }
+
+
+sub send_pt_qd
+{
+  my ($current_time, $event, $file, @buffer)= @_;
+  return 0 unless ($since <= $current_time && $current_time <= $until);
+  printf("processing %s %s at %s.\n", $current_time->ymd, $current_time->hms, basename($file))
+    if ($opt->{report} && (++$event % $opt->{report}) == 0);
+
+  unless ($pm->start)
+  {
+    open(my $process, sprintf($cmd_format,
+                              $pt_dsn . ",t=global_query_review",
+                              $pt_dsn . ",t=global_query_review_history",
+                              $ENV{HOSTNAME}));
+    print $process @buffer;
+    close($process);
+    $pm->finish;
+  }
+
+  return ++$event;
+}
+
 
