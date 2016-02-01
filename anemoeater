@@ -24,6 +24,7 @@ use utf8;
 
 use FindBin qw/$Bin/;
 use Time::Piece;
+use File::Basename qw/basename/;
 use DBI;
 use Parallel::ForkManager;
 use Getopt::Long qw/:config posix_default bundling no_ignore_case gnu_compat/;
@@ -53,21 +54,20 @@ GetOptions($opt, qw/socket=s host=s port=i user=s password=s
                     parallel=i since=s until=s report=i cell=i
                     help usage no-docker local/) or die;
 usage() if $opt->{help} || $opt->{usage};
+usage("--cell should not be 0") unless $opt->{cell};
+my $since= parse_time($opt->{since}, &TIME_FORMAT);
+usage("Can't parse --since") unless $since;
+my $until= parse_time($opt->{until}, &TIME_FORMAT);
+usage("Can't parse --until") unless $until;
 $opt->{docker}= 0 if $opt->{"no-docker"};
 
 usage("Too many arguments.") if $#ARGV > 1;
-my $file= $ARGV[0];
-usage("Slow log $file can't read.") unless -r $file;
+my @files= @ARGV;
 
-usage("--cell should not be 0") unless $opt->{cell};
-
-my $since= parse_time($opt->{since}, &TIME_FORMAT);
-usage("Can't parse --since") unless $since;
-
-my $until= parse_time($opt->{until}, &TIME_FORMAT);
-usage("Can't parse --until") unless $until;
-
-
+foreach my $file (@files)
+{
+  usage("Slow log $file can't read.") unless -r $file;
+}
 
 ### Starting docker container.
 if ($opt->{docker})
@@ -123,64 +123,100 @@ $pt_dsn  .= sprintf(",p=%s", $opt->{password}) if $opt->{password};
 
 my $cmd_format= qq{| /usr/bin/pt-query-digest --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
 
-my $pm  = Parallel::ForkManager->new($opt->{parallel});
-open(my $in, "<", $file);
 
-my $event  = 0;
-my $timetmp= 0;
-my $current_time;
-my $previous_time;
-my @buffer = ();
-while (<$in>)
+foreach my $file (@files)
 {
-  if (/^# Time: (?<timestr>.+)$/)
+  open(my $in, "<", $file);
+  
+  my $pm  = Parallel::ForkManager->new($opt->{parallel});
+
+  my $event  = 0;
+  my $timetmp= 0;
+  my $current_time;
+  my $previous_time;
+  my @buffer = ();
+  while (<$in>)
   {
-    if ($+{timestr} =~ /(?<year>\d{2})(?<month>\d{2})(?<day>\d{2})\s+
-                        (?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})/x)
+    if (/^# Time: (?<timestr>.+)$/)
     {
-      ### 5.0, 5.1, 5.5, 5.6 style.
-      # "# Time: %02d%02d%02d %2d:%02d:%02d\n",
-
-      ### normalize without seconds.
-      $timetmp= sprintf("20%02d%02d%02d%02d%02d",
-                        $+{year}, $+{month}, $+{day},
-                        $+{hour}, $+{minute}, $+{second});
-
+      if ($+{timestr} =~ /(?<year>\d{2})(?<month>\d{2})(?<day>\d{2})\s+
+                          (?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})/x)
+      {
+        ### 5.0, 5.1, 5.5, 5.6 style.
+        # "# Time: %02d%02d%02d %2d:%02d:%02d\n",
+  
+        ### normalize without seconds.
+        $timetmp= sprintf("20%02d%02d%02d%02d%02d",
+                          $+{year}, $+{month}, $+{day},
+                          $+{hour}, $+{minute}, $+{second});
+  
+      }
+      elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
+                             (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.
+                             (?<fraction>\d{6})(?<timezone>.*)/x)
+      {
+        ### 5.7 style.
+        # "%04d-%02d-%02dT%02d:%02d:%02d.%06lu%s",
+   
+        ### normalize without seconds.
+        $timetmp= sprintf("%04d%02d%02d%02d%02d",
+                          $+{year}, $+{month}, $+{day},
+                          $+{hour}, $+{minute}, $+{second});
+      }
+      else
+      {
+        ### Unknown format.
+        $timetmp= 0;
+      }
+  
+      $current_time= Time::Piece->strptime($timetmp, "%Y%m%d%H%M%S");
+  
+      if (!($previous_time) || ($current_time - $previous_time) >= ($opt->{cell} * 60))
+      {
+        &send_pt_qd;
+        $previous_time= $current_time;
+        @buffer= ();
+      }
     }
-    elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
-                           (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.
-                           (?<fraction>\d{6})(?<timezone>.*)/x)
-    {
-      ### 5.7 style.
-      # "%04d-%02d-%02dT%02d:%02d:%02d.%06lu%s",
- 
-      ### normalize without seconds.
-      $timetmp= sprintf("%04d%02d%02d%02d%02d",
-                        $+{year}, $+{month}, $+{day},
-                        $+{hour}, $+{minute}, $+{second});
-    }
-    else
-    {
-      ### Unknown format.
-      $timetmp= 0;
-    }
+    push(@buffer, $_);
+  }
+  
+  ### flush last block.
+  &send_pt_qd if @buffer;
+  
+  $pm->wait_all_children;
+  
+  
+  ### Update hostname_max by filename.
+  my $dsn     = "dbi:mysql:slow_query_log";
+  $dsn       .= sprintf(";host=%s", $opt->{host}) if $opt->{host};
+  $dsn       .= sprintf(";port=%d", $opt->{port}) if $opt->{port};
+  my $user    = $opt->{user} ? $opt->{user} : "anemometer";
+  my $password= $opt->{password} ? $opt->{password} : "";
+  
+  my $conn= DBI->connect($dsn, $user, $password, {mysql_use_utf8 => 1});
+  $conn->do("UPDATE global_query_review_history SET hostname_max= ? WHERE hostname_max= ?",
+            undef,
+            basename($file), $ENV{HOSTNAME});
 
-    $current_time= Time::Piece->strptime($timetmp, "%Y%m%d%H%M%S");
-
-    if (!($previous_time) || ($current_time - $previous_time) >= ($opt->{cell} * 60))
+  sub send_pt_qd
+  {
+    return 0 unless ($since <= $current_time && $current_time <= $until);
+    printf("processing %s.\n", $current_time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
+  
+    unless ($pm->start)
     {
-      &send_pt_qd;
-      $previous_time= $current_time;
-      @buffer= ();
+      open(my $process, sprintf($cmd_format,
+                                $pt_dsn . ",t=global_query_review",
+                                $pt_dsn . ",t=global_query_review_history",
+                                $ENV{HOSTNAME}));
+      print $process @buffer;
+      close($process);
+      $pm->finish;
     }
   }
-  push(@buffer, $_);
-}
+} 
 
-### flush last block.
-&send_pt_qd if @buffer;
-
-$pm->wait_all_children;
 
 exit 0;
 
@@ -212,23 +248,6 @@ EOF
 }
 
 
-sub send_pt_qd
-{
-  return 0 unless ($since <= $current_time && $current_time <= $until);
-  printf("processing %s.\n", $current_time) if ($opt->{report} && (++$event % $opt->{report}) == 0);
-
-  unless ($pm->start)
-  {
-    open(my $process, sprintf($cmd_format,
-                              $pt_dsn . ",t=global_query_review",
-                              $pt_dsn . ",t=global_query_review_history",
-                              $ENV{HOSTNAME}));
-    print $process @buffer;
-    close($process);
-    $pm->finish;
-  }
-} 
-
 
 
 sub parse_time
@@ -246,5 +265,4 @@ sub parse_time
     return $ret unless $@;
   }
 }
-
 
