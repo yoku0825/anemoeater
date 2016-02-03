@@ -44,7 +44,7 @@ usage("/usr/bin/pt-query-digest isn't executable .") unless -x "/usr/bin/pt-quer
 my $opt= {parallel => 2,
           since    => "1970/1/1",
           until    => "9999/12/31",
-          report   => 100,
+          report   => 15,
           cell     => 1,
           help     => 0,
           docker   => 1,
