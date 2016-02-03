@@ -61,7 +61,6 @@ my $until= parse_time($opt->{until}, &TIME_FORMAT);
 usage("Can't parse --until") unless $until;
 $opt->{docker}= 0 if $opt->{"no-docker"};
 
-usage("Too many arguments.") if $#ARGV > 1;
 my @files= @ARGV;
 
 foreach my $file (@files)
