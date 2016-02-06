@@ -31,7 +31,7 @@ $ ./anemoeater path_to_slow_log
 |--since=s    |スローログ読み取りの開始時刻（これ以前の時刻のログを読み飛ばす）                           |"1970/1/1"    |
 |--unti=sl    |スローログ読み取りの終了時刻（これ以降の時刻のログを読み飛ばす）                           |"9999/12/31"  |
 |--report=i   |この数値までpt-query-digestを起動したら標準出力に現在処理中のログ時刻を出力                |15            |
-|--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |1             |
+|--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5             |
 |--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A           |
 |--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A           |
 
