@@ -216,17 +216,29 @@ $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
 
   $0 is split slowlog and process by pt-query-digest.
 
+  --socket=s   MySQL socket which pt-query-digest uses to connection.
+  --host=s     MySQL host which pt-query-digest uses to connection.
+  --port=i     MySQL port which pt-query-digest uses to connection.
   --user=s     MySQL user which pt-query-digest uses to connection.
   --password=s MySQL password which pt-query-digest uses to connection.
-  --port=i     MySQL port which pt-query-digest uses to connection.
-  --host=s     MySQL host which pt-query-digest uses to connection.
-  --socket=s   MySQL socket which pt-query-digest uses to connection.
-  --parallel=i How many processes does script run concurrently (default: 2)
-  --since=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
-  --until=i    Filter for processing slow-log, YYYYMMDDHHNN style only.
-  --report=i   Print message each processed events n times (default: 100)
-  --no-docker  Do not use docker image. Must specify --user, --password, --port and --host.
+  --parallel=i How many processes does script run concurrently (default: CPU threads * 1.5)
+  --since=i    Filter for processing slow-log, see also "Supported datetime styles".
+  --until=i    Filter for processing slow-log, see also "Supported datetime styles".
+  --report=i   Print message each processed events n times (default: 15)
+  --cell=i     How many minutes buffering and aggregating (default: 5[min])
+  --no-docker  Do not use docker image. Must specify --user, --password, --port and --host(or --socket).
   --local      Using docker container but using local built(Do not use yoku0825/anemoeater)
+
+  Supported datetime styles are
+    "%Y/%m/%d %H:%M:%S" (ex. "2016/02/08 11:01:22")
+    "%Y/%m/%d %H:%M"    (ex. "2016/02/08 11:01")
+    "%Y/%m/%d"          (ex. "2016/02/08")
+    "%Y-%m-%d %H:%M:%S" (ex. "2016-02-08 11:01:22")
+    "%Y-%m-%d %H:%M"    (ex. "2016-02-08 11:01")
+    "%Y-%m-%d"          (ex. "2016-02-08")
+    "%Y%m%d%H%M%S"      (ex. "20160208110122")
+    "%Y%m%d%H%M"        (ex. "201602081101")
+    "%Y%m%d"            (ex. "20160208")
 EOF
   exit 0;
 }
