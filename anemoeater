@@ -63,6 +63,7 @@ $opt->{docker}= 0 if $opt->{"no-docker"};
 
 my @files= @ARGV;
 
+usage("Slow log file was not specified.") unless @files;
 foreach my $file (@files)
 {
   usage("Slow log $file can't read.") unless -r $file;
