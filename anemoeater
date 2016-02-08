@@ -41,7 +41,7 @@ use constant TIME_FORMAT => ["%Y/%m/%d %H:%M:%S",
 
 usage("/usr/bin/pt-query-digest isn't executable .") unless -x "/usr/bin/pt-query-digest";
 
-my $opt= {parallel => 2,
+my $opt= {parallel => int(&count_cpu_thread * 1.5),
           since    => "1970/1/1",
           until    => "9999/12/31",
           report   => 15,
@@ -269,4 +269,12 @@ sub send_pt_qd
   return ++$event;
 }
 
+
+sub count_cpu_thread
+{
+  my $thread= `grep processor /proc/cpuinfo | tail -1 | awk '{print \$3}'`;
+  chomp($thread);
+
+  return $thread ? $thread : 1;
+}
 
