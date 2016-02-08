@@ -20,20 +20,20 @@ $ ./anemoeater path_to_slow_log
 
 ## オプション
 
-|オプション   |意味                                                                                       |デフォルト    |
-|-------------|-------------------------------------------------------------------------------------------|--------------|
-|--socket=s   |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLソケット  |DBD::mysql依存|
-|--host=s     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLホスト    |DBD::mysql依存|
-|--port=i     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLポート    |DBD::mysql依存|
-|--user=s     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合のMySQLユーザー        |"anemometer"  |
-|--password=s |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合のMySQLパスワード      |""            |
-|--parallel=i |この数値までフォークして並列でpt-query-digestを起動する                                    |2             |
-|--since=s    |スローログ読み取りの開始時刻（これ以前の時刻のログを読み飛ばす）                           |"1970/1/1"    |
-|--unti=sl    |スローログ読み取りの終了時刻（これ以降の時刻のログを読み飛ばす）                           |"9999/12/31"  |
-|--report=i   |この数値までpt-query-digestを起動したら標準出力に現在処理中のログ時刻を出力                |15            |
-|--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5             |
-|--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A           |
-|--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A           |
+|オプション   |意味                                                                                       |デフォルト       |
+|-------------|-------------------------------------------------------------------------------------------|-----------------|
+|--socket=s   |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLソケット  |DBD::mysql依存   |
+|--host=s     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLホスト    |DBD::mysql依存   |
+|--port=i     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合の接続先MySQLポート    |DBD::mysql依存   |
+|--user=s     |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合のMySQLユーザー        |"anemometer"     |
+|--password=s |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合のMySQLパスワード      |""               |
+|--parallel=i |この数値までフォークして並列でpt-query-digestを起動する                                    |CPUスレッド数 * 2|
+|--since=s    |スローログ読み取りの開始時刻（これ以前の時刻のログを読み飛ばす）                           |"1970/1/1"       |
+|--unti=sl    |スローログ読み取りの終了時刻（これ以降の時刻のログを読み飛ばす）                           |"9999/12/31"     |
+|--report=i   |この数値までpt-query-digestを起動したら標準出力に現在処理中のログ時刻を出力                |15               |
+|--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5                |
+|--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A              |
+|--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A              |
 
 
 ## 引数
