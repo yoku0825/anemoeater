@@ -1,6 +1,6 @@
 # anemoeater
 
-anemo *eat* erは [box/Anemometer](https://github.com/box/Anemometer) をdockerコンテナーとして起動して、[percona-toolkit](https://github.com/percona/percona-toolkit)の`pt-query-digest`の結果を食わせるためのラッパースクリプトです。
+anemo **eat** erは [box/Anemometer](https://github.com/box/Anemometer) をdockerコンテナーとして起動して、[percona-toolkit](https://github.com/percona/percona-toolkit)の`pt-query-digest`の結果を食わせるためのラッパースクリプトです。
 
 ## クイックスタート
 
@@ -34,6 +34,7 @@ $ ./anemoeater path_to_slow_log
 |--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5                  |
 |--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A                |
 |--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A                |
+|--binlog     |入力ファイルにスローログではなくバイナリーログを使う                                       |N/A                |
 
 
 ## 引数

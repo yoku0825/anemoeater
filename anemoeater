@@ -49,10 +49,11 @@ my $opt= {parallel => int(&count_cpu_thread * 1.5),
           help     => 0,
           docker   => 1,
           local    => 0,
+          binlog   => 0,
          };
 GetOptions($opt, qw/socket=s host=s port=i user=s password=s
                     parallel=i since=s until=s report=i cell=i
-                    help usage no-docker local/) or die;
+                    help usage no-docker local binlog/) or die;
 usage() if $opt->{help} || $opt->{usage};
 usage("--cell should not be 0") unless $opt->{cell};
 my $since= parse_time($opt->{since}, &TIME_FORMAT);
@@ -121,14 +122,25 @@ $pt_dsn  .= sprintf(",P=%d", $opt->{port})     if $opt->{port};
 $pt_dsn  .= sprintf(",u=%s", $opt->{user})     if $opt->{user};
 $pt_dsn  .= sprintf(",p=%s", $opt->{password}) if $opt->{password};
 
-my $cmd_format= qq{| /usr/bin/pt-query-digest --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
+my $cmd_format= qq{| /usr/bin/pt-query-digest --type=%s --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
 
 
 my $pm  = Parallel::ForkManager->new($opt->{parallel});
 
 foreach my $file (@files)
 {
-  open(my $in, "<", $file);
+  my $in;
+
+  if ($opt->{binlog})
+  {
+    ### decode by mysqlbinlog
+    open($in, "mysqlbinlog $file |");
+  }
+  else
+  {
+    ### open as slow-log.
+    open($in, "<", $file);
+  }
 
   my $event  = 0;
   my $timetmp= 0;
@@ -137,12 +149,13 @@ foreach my $file (@files)
   my @buffer = ();
   while (<$in>)
   {
-    if (/^# Time: (?<timestr>.+)$/)
+    ### Slowlog or Binlog style.
+    if (/^# Time: (?<timestr>.+)$/ || /^#(?<timestr>[\d\s:]+) server id/)
     {
       if ($+{timestr} =~ /(?<year>\d{2})(?<month>\d{2})(?<day>\d{2})\s+
                           (?<hour>\d{1,2}):(?<minute>\d{2}):(?<second>\d{2})/x)
       {
-        ### 5.0, 5.1, 5.5, 5.6 style.
+        ### 5.0, 5.1, 5.5, 5.6 style slow-log and binary-log.
         # "# Time: %02d%02d%02d %2d:%02d:%02d\n",
   
         ### normalize without seconds.
@@ -276,6 +289,7 @@ sub send_pt_qd
   unless ($pm->start)
   {
     open(my $process, sprintf($cmd_format,
+                              $opt->{binlog} ? "binlog" : "slowlog",
                               $pt_dsn . ",t=global_query_review",
                               $pt_dsn . ",t=global_query_review_history",
                               $ENV{HOSTNAME}));

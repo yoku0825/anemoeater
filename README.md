@@ -1,6 +1,8 @@
 # anemoeater
 
-anemo *eat* er is wrapper script of [box/Anemometer](https://github.com/box/Anemometer) and pt-query-digest in [percona-toolkit](https://github.com/percona/percona-toolkit).
+anemo __eat__ er is wrapper script of [box/Anemometer](https://github.com/box/Anemometer) and pt-query-digest in [percona-toolkit](https://github.com/percona/percona-toolkit).
+
+README for Japanese is [here](README_ja.md).
 
 ## QuickStart
 
