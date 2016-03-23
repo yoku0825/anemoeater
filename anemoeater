@@ -156,12 +156,17 @@ foreach my $file (@files)
                              (?<fraction>\d{6})(?<timezone>.*)/x)
       {
         ### 5.7 style.
-        # "%04d-%02d-%02dT%02d:%02d:%02d.%06lu%s",
+        # "# Time: %04d-%02d-%02dT%02d:%02d:%02d.%06lu%s",
    
         ### normalize without seconds.
         $timetmp= sprintf("%04d%02d%02d%02d%02d",
                           $+{year}, $+{month}, $+{day},
                           $+{hour}, $+{minute}, $+{second});
+        
+        ### replace buffer's timestr.
+        $_= sprintf("# Time: %02d%02d%02d %2d:%02d:%02d\n",
+                    substr($+{year}, 2, 2), $+{month}, $+{day},
+                    $+{hour}, $+{minute}, $+{second});
       }
       else
       {
