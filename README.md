@@ -48,6 +48,7 @@ $ ./anemoeater path_to_slow_log
 |--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A                  |
 |--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A                  |
 |--binlog     |入力ファイルにスローログではなくバイナリーログを使う                                       |N/A                  |
+|--use-docker-for-pt| /usr/bin/pt-query-digestの代わりに yoku0825/percona-toolkit のDockerイメージをを使う|0|
 
 
 ## 引数

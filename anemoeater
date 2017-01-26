@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 ########################################################################
-# Copyright (C) 2016  yoku0825
+# Copyright (C) 2016, 2017  yoku0825
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -39,21 +39,21 @@ use constant TIME_FORMAT => ["%Y/%m/%d %H:%M:%S",
                              "%Y%m%d%H%M",
                              "%Y%m%d"];
 
-usage("/usr/bin/pt-query-digest isn't executable .") unless -x "/usr/bin/pt-query-digest";
 
-my $opt= {parallel => int(&count_cpu_thread * 1.5),
-          since    => Time::Piece::localtime->add_months(-1)->strftime("%Y%m%d"),
-          until    => "9999/12/31",
-          report   => 15,
-          cell     => 5,
-          help     => 0,
-          docker   => 1,
-          local    => 0,
-          binlog   => 0,
+my $opt= {parallel  => int(&count_cpu_thread * 1.5),
+          since     => Time::Piece::localtime->add_months(-1)->strftime("%Y%m%d"),
+          until     => "9999/12/31",
+          report    => 15,
+          cell      => 5,
+          help      => 0,
+          docker    => 1,
+          local     => 0,
+          binlog    => 0,
+          pt_docker => 0,
          };
 GetOptions($opt, qw/socket=s host=s port=i user=s password=s
                     parallel=i since=s until=s report=i cell=i
-                    help usage no-docker local binlog/) or die;
+                    help usage no-docker local binlog use-docker-for-pt/) or die;
 usage() if $opt->{help} || $opt->{usage};
 usage("--cell should not be 0") unless $opt->{cell};
 my $since= parse_time($opt->{since}, &TIME_FORMAT);
@@ -61,6 +61,20 @@ usage("Can't parse --since") unless $since;
 my $until= parse_time($opt->{until}, &TIME_FORMAT);
 usage("Can't parse --until") unless $until;
 $opt->{docker}= 0 if $opt->{"no-docker"};
+$opt->{pt_docker}= 1 if $opt->{"use-docker-for-pt"};
+
+our $pt_qd;
+if ($opt->{pt_docker})
+{
+  system("sudo docker pull yoku0825/percona-toolkit");
+  $pt_qd= "sudo docker run yoku0825/percona-toolkit pt-query-digest";
+}
+else
+{
+  usage("--use-docker-for-pt is not specified but /usr/bin/pt-query-digest isn't executable.")
+    unless -x "/usr/bin/pt-query-digest";
+  $pt_qd= "/usr/bin/pt-query-digest";
+}  
 
 my @files= @ARGV;
 
@@ -81,6 +95,7 @@ if ($opt->{docker})
   }
   else
   {
+    system("sudo docker pull yoku0825/anemoeater");
     $repository= "yoku0825/anemoeater";
   }
 
@@ -122,7 +137,7 @@ $pt_dsn  .= sprintf(",P=%d", $opt->{port})     if $opt->{port};
 $pt_dsn  .= sprintf(",u=%s", $opt->{user})     if $opt->{user};
 $pt_dsn  .= sprintf(",p=%s", $opt->{password}) if $opt->{password};
 
-my $cmd_format= qq{| /usr/bin/pt-query-digest --type=%s --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
+my $cmd_format= qq{| %s --type=%s --no-version-check --review %s --history %s --no-report --limit=0%% --filter="\\\$event->{Bytes} = length(\\\$event->{arg}) and \\\$event->{hostname}='%s'" > /dev/null};
 
 
 my $pm  = Parallel::ForkManager->new($opt->{parallel});
@@ -230,7 +245,7 @@ sub usage
   print $msg, "\n" if $msg;
   print << "EOF";
 $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
-   [--parallel=i] [--since=i] [--until=i] [--report=i] [--docker] slowlog
+   [--parallel=i] [--since=i] [--until=i] [--report=i] slowlog
 
   $0 is split slowlog and process by pt-query-digest.
 
@@ -246,6 +261,7 @@ $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
   --cell=i     How many minutes buffering and aggregating (default: 5[min])
   --no-docker  Do not use docker image. Must specify --user, --password, --port and --host(or --socket).
   --local      Using docker container but using local built(Do not use yoku0825/anemoeater)
+  --use-docker-for-pt Using pt-query-digest via docker contaier (yoku0825/percona-toolkit)
 
   Supported datetime styles are
     "%Y/%m/%d %H:%M:%S" (ex. "2016/02/08 11:01:22")
@@ -289,6 +305,7 @@ sub send_pt_qd
   unless ($pm->start)
   {
     open(my $process, sprintf($cmd_format,
+                              $pt_qd,
                               $opt->{binlog} ? "binlog" : "slowlog",
                               $pt_dsn . ",t=global_query_review",
                               $pt_dsn . ",t=global_query_review_history",
