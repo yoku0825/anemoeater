@@ -18,6 +18,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 ########################################################################
 
+use constant VERSION => "0.0.1";
 use strict;
 use warnings;
 use utf8;
@@ -27,6 +28,7 @@ use Time::Piece;
 use File::Basename qw/basename/;
 use DBI;
 use Parallel::ForkManager;
+use Socket;
 use Getopt::Long qw/:config posix_default bundling no_ignore_case gnu_compat/;
 
 use constant TIME_FORMAT => ["%Y/%m/%d %H:%M:%S",
@@ -39,7 +41,8 @@ use constant TIME_FORMAT => ["%Y/%m/%d %H:%M:%S",
                              "%Y%m%d%H%M",
                              "%Y%m%d"];
 
-
+our $hostname= $ENV{HOSTNAME} ? $ENV{HOSTNAME} : "localhost";
+our $ipaddr  = inet_ntoa(inet_aton($hostname));
 my $opt= {parallel  => int(&count_cpu_thread * 1.5),
           since     => Time::Piece::localtime->add_months(-1)->strftime("%Y%m%d"),
           until     => "9999/12/31",
@@ -66,7 +69,7 @@ $opt->{pt_docker}= 1 if $opt->{"use-docker-for-pt"};
 our $pt_qd;
 if ($opt->{pt_docker})
 {
-  system("sudo docker pull yoku0825/percona-toolkit");
+  system("sudo docker pull yoku0825/percona-toolkit > /dev/null");
   $pt_qd= "sudo docker run yoku0825/percona-toolkit pt-query-digest";
 }
 else
@@ -95,7 +98,7 @@ if ($opt->{docker})
   }
   else
   {
-    system("sudo docker pull yoku0825/anemoeater");
+    system("sudo docker pull yoku0825/anemoeater > /dev/null");
     $repository= "yoku0825/anemoeater";
   }
 
@@ -127,8 +130,8 @@ if ($opt->{docker})
   $opt->{password}= undef;
   $opt->{port}    = undef;
 
-  printf("Docker container starts with $container_ipaddr.\n");
-  printf("URL will be http://$ENV{HOSTNAME}:$publish_port/anemometer\n");
+  printf("Docker container starts with %s.\n", $container_ipaddr);
+  printf("URL will be http://%s:%d/anemometer\n", $ipaddr, $publish_port);
 }
 
 my $pt_dsn= "D=slow_query_log";
@@ -230,7 +233,7 @@ foreach my $file (@files)
   my $conn= DBI->connect($dsn, $user, $password, {mysql_use_utf8 => 1});
   $conn->do("UPDATE global_query_review_history SET hostname_max= REPLACE(?, '.log', '') WHERE hostname_max= ?",
             undef,
-            basename($file), $ENV{HOSTNAME});
+            basename($file), $hostname);
 
 } 
 
@@ -309,7 +312,7 @@ sub send_pt_qd
                               $opt->{binlog} ? "binlog" : "slowlog",
                               $pt_dsn . ",t=global_query_review",
                               $pt_dsn . ",t=global_query_review_history",
-                              $ENV{HOSTNAME}));
+                              $hostname));
     print $process @buffer;
     close($process);
     $pm->finish;
