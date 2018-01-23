@@ -1,0 +1,29 @@
+*** Anemometer.php.orig 2016-04-05 15:17:31.000000000 +0900
+--- Anemometer.php      2018-01-23 16:26:38.210585113 +0900
+***************
+*** 364,374 ****
+
+!         if (preg_match('/^[0-9]+$/', $checksum))
+!         {
+!             return $checksum;
+!         }
+!         else if (preg_match('/^[0-9A-Fa-f]+$/', $checksum))
+!         {
+!             return $this->bchexdec($checksum);
+!         }
+!         else if (strlen($checksum) == 0)
+          {
+--- 364,366 ----
+
+!         if (strlen($checksum) == 0)
+          {
+***************
+*** 378,380 ****
+          {
+!             throw new Exception("Invalid query checksum");
+          }
+--- 370,372 ----
+          {
+!             return $this->bchexdec($checksum);
+          }
+
