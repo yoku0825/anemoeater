@@ -2,6 +2,7 @@
 
 ########################################################################
 # Copyright (C) 2016, 2017  yoku0825
+# Copyright (C) 2018,       yokogawa-k
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -18,7 +19,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 ########################################################################
 
-use constant VERSION => "0.0.1";
+use constant VERSION => "0.0.2";
 use strict;
 use warnings;
 use utf8;
