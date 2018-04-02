@@ -70,7 +70,7 @@ our $pt_qd;
 if ($opt->{pt_docker})
 {
   system("sudo docker pull yoku0825/percona-toolkit > /dev/null");
-  $pt_qd= "sudo docker run yoku0825/percona-toolkit pt-query-digest";
+  $pt_qd= "sudo docker run -i yoku0825/percona-toolkit pt-query-digest";
 }
 else
 {
