@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 ########################################################################
-# Copyright (C) 2016, 2017  yoku0825
+# Copyright (C) 2016, 2018  yoku0825
 # Copyright (C) 2018,       yokogawa-k
 #
 # This program is free software; you can redistribute it and/or
@@ -19,7 +19,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 ########################################################################
 
-use constant VERSION => "0.0.2";
+use constant VERSION => "0.0.3";
 use strict;
 use warnings;
 use utf8;
@@ -113,6 +113,8 @@ if ($opt->{docker})
   chomp($publish_port);
 
   ### wait container's mysqld starts to run
+  my $max_retry= 10;
+  my $retry= 0;
   while ()
   {
     eval
@@ -123,7 +125,17 @@ if ($opt->{docker})
     };
 
     last unless $@;
-    sleep 3;
+
+    if (++$retry > $max_retry)
+    {
+      die("Attempt to connect to container $container_id, " .
+          "but can't connect $retry times and giving up to run.\n" .
+          "Please check 'docker logs $container_id' and confirm container runs correctly or not.");
+    }
+    else
+    {
+      sleep 3;
+    }
   }
 
   $opt->{host}    = $container_ipaddr;
