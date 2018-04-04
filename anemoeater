@@ -192,7 +192,7 @@ foreach my $file (@files)
         ### normalize without seconds.
         $timetmp= sprintf("20%02d%02d%02d%02d%02d",
                           $+{year}, $+{month}, $+{day},
-                          $+{hour}, $+{minute}, $+{second});
+                          $+{hour}, $+{minute});
   
       }
       elsif ($+{timestr} =~ /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T
@@ -205,7 +205,7 @@ foreach my $file (@files)
         ### normalize without seconds.
         $timetmp= sprintf("%04d%02d%02d%02d%02d",
                           $+{year}, $+{month}, $+{day},
-                          $+{hour}, $+{minute}, $+{second});
+                          $+{hour}, $+{minute});
         
         ### replace buffer's timestr.
         $_= sprintf("# Time: %02d%02d%02d %2d:%02d:%02d\n",
