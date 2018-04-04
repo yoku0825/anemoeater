@@ -13,7 +13,12 @@ RUN yum install -y Percona-Server-client-56 Percona-Server-shared-56 Percona-Ser
 RUN yum install -y httpd php php-mysql php-bcmath && yum clean all
 
 RUN git clone https://github.com/box/Anemometer.git /var/www/html/anemometer
-RUN /etc/init.d/mysql start && mysql -uroot < /var/www/html/anemometer/install.sql && mysql -uroot < /var/www/html/anemometer/mysql56-install.sql && (echo "GRANT ALL ON *.* TO anemometer" | mysql -uroot)
+RUN chown -R mysql. /var/lib/mysql && \
+    /etc/init.d/mysql start && \
+    mysql -uroot < /var/www/html/anemometer/install.sql && \
+    mysql -uroot < /var/www/html/anemometer/mysql56-install.sql && \
+    (echo "GRANT ALL ON *.* TO anemometer" | mysql -uroot) && \
+    /etc/init.d/mysql stop
 RUN ln -sf /var/www/html/anemometer/conf/sample.config.inc.php /var/www/html/anemometer/conf/config.inc.php
 
 COPY . /opt/setup
@@ -21,5 +26,8 @@ RUN patch /etc/php.ini /opt/setup/php.ini.patch
 RUN patch /var/www/html/anemometer/lib/Anemometer.php /opt/setup/Anemometer.patch
 
 EXPOSE 80
-CMD /etc/init.d/mysql start && /etc/init.d/httpd start && tail -f /dev/null
+CMD chown -R mysql. /var/lib/mysql && \
+    /etc/init.d/mysql start && \
+    /etc/init.d/httpd start && \
+    tail -f /dev/null
 
