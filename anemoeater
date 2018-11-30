@@ -47,23 +47,24 @@ our $ipaddr  = inet_ntoa(inet_aton($hostname));
 my $opt= {parallel  => int(&count_cpu_thread * 1.5),
           since     => Time::Piece::localtime->add_months(-1)->strftime("%Y%m%d"),
           until     => "9999/12/31",
+          type      => "slowlog",
           report    => 15,
           cell      => 5,
           help      => 0,
           docker    => 1,
           local     => 0,
-          binlog    => 0,
           pt_docker => 0,
          };
 GetOptions($opt, qw/socket=s host=s port=i user=s password=s
-                    parallel=i since=s until=s report=i cell=i
-                    help usage no-docker local binlog use-docker-for-pt/) or die;
+                    parallel=i since=s until=s type=s report=i cell=i
+                    help usage no-docker local use-docker-for-pt/) or die;
 usage() if $opt->{help} || $opt->{usage};
 usage("--cell should not be 0") unless $opt->{cell};
 my $since= parse_time($opt->{since}, &TIME_FORMAT);
 usage("Can't parse --since") unless $since;
 my $until= parse_time($opt->{until}, &TIME_FORMAT);
 usage("Can't parse --until") unless $until;
+usage("'$opt->{type}' is not a valid input type") unless grep {$_ eq $opt->{type}} qw(slowlog binlog tcpdump);
 $opt->{docker}= 0 if $opt->{"no-docker"};
 $opt->{pt_docker}= 1 if $opt->{"use-docker-for-pt"};
 
@@ -161,7 +162,7 @@ foreach my $file (@files)
 {
   my $in;
 
-  if ($opt->{binlog})
+  if ($opt->{type} eq "binlog")
   {
     ### decode by mysqlbinlog
     open($in, "mysqlbinlog $file |");
@@ -226,6 +227,28 @@ foreach my $file (@files)
         @buffer= ();
       }
     }
+    ### tcpdump
+    elsif ($opt->{type} eq "tcpdump")
+    {
+      if (/^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})\s
+             (?<hour>\d{2}):(?<minute>\d{2}):(?<second>\d{2})\.(?<fraction>\d{6})\s
+             IP\s[0-9\.]+\s[<>]\s[0-9\.]+:\stcp\s[0-9]+$/x)
+      {
+        ### normalize without seconds.
+        $timetmp= sprintf("%04d%02d%02d%02d%02d",
+                          $+{year}, $+{month}, $+{day},
+                          $+{hour}, $+{minute});
+
+        $current_time= Time::Piece->strptime($timetmp, "%Y%m%d%H%M%S");
+
+        if (!($previous_time) || ($current_time - $previous_time) >= ($opt->{cell} * 60))
+        {
+          $event= &send_pt_qd($current_time, $event, $file, @buffer);
+          $previous_time= $current_time;
+          @buffer= ();
+        }
+      }
+    }
     push(@buffer, $_);
   }
   
@@ -260,7 +283,7 @@ sub usage
   print $msg, "\n" if $msg;
   print << "EOF";
 $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
-   [--parallel=i] [--since=i] [--until=i] [--report=i] slowlog
+   [--parallel=i] [--since=i] [--until=i] [--report=i] [--type=s] slowlog
 
   $0 is split slowlog and process by pt-query-digest.
 
@@ -272,6 +295,7 @@ $0 [--user=s] [--password=s] [--port=i] [--host=s] [--socket=s]
   --parallel=i How many processes does script run concurrently (default: CPU threads * 1.5)
   --since=i    Filter for processing slow-log, see also "Supported datetime styles".
   --until=i    Filter for processing slow-log, see also "Supported datetime styles".
+  --type       The type of input to parse (default: slowlog). The permitted types are slowlog, binlog, tcpdump.
   --report=i   Print message each processed events n times (default: 15)
   --cell=i     How many minutes buffering and aggregating (default: 5[min])
   --no-docker  Do not use docker image. Must specify --user, --password, --port and --host(or --socket).
@@ -321,7 +345,7 @@ sub send_pt_qd
   {
     open(my $process, sprintf($cmd_format,
                               $pt_qd,
-                              $opt->{binlog} ? "binlog" : "slowlog",
+                              $opt->{type},
                               $pt_dsn . ",t=global_query_review",
                               $pt_dsn . ",t=global_query_review_history",
                               $hostname));

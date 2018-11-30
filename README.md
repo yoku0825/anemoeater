@@ -47,8 +47,8 @@ $ ./anemoeater path_to_slow_log
 |--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5                    |
 |--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A                  |
 |--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A                  |
-|--binlog     |入力ファイルにスローログではなくバイナリーログを使う                                       |N/A                  |
 |--use-docker-for-pt| /usr/bin/pt-query-digestの代わりに yoku0825/percona-toolkit のDockerイメージをを使う|0|
+|--type=s     |入力ファイルとして利用するファイルの種類を指定する。サポートしているファイルの種類はslowlog、binlog、tcpdump|slowlog              |
 
 
 ## 引数
