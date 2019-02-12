@@ -8,7 +8,7 @@ RUN test -d /opt/setup || mkdir /opt/setup
 RUN git clone https://github.com/yoku0825/init_script.git /opt/setup/init_script.git
 RUN bash /opt/setup/init_script.git/docker/docker_basic.sh
 
-RUN yum install -y http://www.percona.com/downloads/percona-release/redhat/0.1-4/percona-release-0.1-4.noarch.rpm && yum clean all
+RUN yum install -y https://www.percona.com/redir/downloads/percona-release/redhat/latest/percona-release-0.1-6.noarch.rpm && yum clean all
 RUN yum install -y Percona-Server-client-56 Percona-Server-shared-56 Percona-Server-server-56 && yum clean all
 RUN yum install -y httpd php php-mysql php-bcmath && yum clean all
 
