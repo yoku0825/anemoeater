@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 ########################################################################
-# Copyright (C) 2016, 2018  yoku0825
+# Copyright (C) 2016, 2019  yoku0825
 # Copyright (C) 2018,       yokogawa-k
 #
 # This program is free software; you can redistribute it and/or
@@ -19,7 +19,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 ########################################################################
 
-use constant VERSION => "0.0.5";
+use constant VERSION => "0.0.6";
 use strict;
 use warnings;
 use utf8;
@@ -57,7 +57,8 @@ my $opt= {parallel  => int(&count_cpu_thread * 1.5),
          };
 GetOptions($opt, qw/socket=s host=s port=i user=s password=s
                     parallel=i since=s until=s type=s report=i cell=i
-                    help usage no-docker local use-docker-for-pt/) or die;
+                    help usage no-docker local use-docker-for-pt
+                    pt-query-digest=s /) or die;
 usage() if $opt->{help} || $opt->{usage};
 usage("--cell should not be 0") unless $opt->{cell};
 my $since= parse_time($opt->{since}, &TIME_FORMAT);
@@ -67,19 +68,32 @@ usage("Can't parse --until") unless $until;
 usage("'$opt->{type}' is not a valid input type") unless grep {$_ eq $opt->{type}} qw(slowlog binlog tcpdump);
 $opt->{docker}= 0 if $opt->{"no-docker"};
 $opt->{pt_docker}= 1 if $opt->{"use-docker-for-pt"};
+$opt->{"pt-query-digest"} //= "/usr/bin/pt-query-digest";
 
 our $pt_qd;
 if ($opt->{pt_docker})
 {
   system("sudo docker pull yoku0825/percona-toolkit > /dev/null");
-  $pt_qd= "sudo docker run -i yoku0825/percona-toolkit pt-query-digest";
+  $pt_qd= "sudo docker run --rm -i yoku0825/percona-toolkit pt-query-digest";
 }
 else
 {
-  usage("--use-docker-for-pt is not specified but /usr/bin/pt-query-digest isn't executable.")
-    unless -x "/usr/bin/pt-query-digest";
-  $pt_qd= "/usr/bin/pt-query-digest";
-}  
+  usage(sprintf("%s isn't executable.\n" .
+                "Use --use-docker-for-pt or --pt-query-digest=/path/to/pt-query-digest for using pt-query-digest.",
+                $opt->{"pt-query-digest"})) unless -x $opt->{"pt-query-digest"};
+  $pt_qd= $opt->{"pt-query-digest"};
+}
+
+### Anemometer is broken in pt-query-digest >= 3.0.11
+### See https://github.com/box/Anemometer/issues/200
+my $pt_version= `$pt_qd --version`;
+$pt_version =~ /pt-query-digest\s+(\d+)\.(\d+)\.(\d+)/;
+
+if ($1 * 10000 + $2 * 100 + $3 >= 30011)
+{
+  die("box/Anemometer is broken in pt-query-digest >= 3.0.11.\n" .
+      "See https://github.com/box/Anemometer/issues/200");
+}
 
 my @files= @ARGV;
 

@@ -42,12 +42,13 @@ $ ./anemoeater path_to_slow_log
 |--password=s |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる場合のMySQLパスワード      |""                   |
 |--parallel=i |この数値までフォークして並列でpt-query-digestを起動する                                    |CPUスレッド数 * 1.5  |
 |--since=s    |スローログ読み取りの開始時刻（これ以前の時刻のログを読み飛ばす）                           |現在時刻マイナス1か月|
-|--unti=sl    |スローログ読み取りの終了時刻（これ以降の時刻のログを読み飛ばす）                           |"9999/12/31"         |
+|--unti=s     |スローログ読み取りの終了時刻（これ以降の時刻のログを読み飛ばす）                           |"9999/12/31"         |
 |--report=i   |この数値までpt-query-digestを起動したら標準出力に現在処理中のログ時刻を出力                |15                   |
 |--cell=i     |何分単位でログをpt-query-digestに送るか                                                    |5                    |
 |--no-docker  |Dockerコンテナーを使わずに既存のAnemometerにスローログを食わせる                           |N/A                  |
 |--local      |yoku0825/anemoeaterをpullせず、Dockerfileからローカルホストにanemoeaterイメージをビルドする|N/A                  |
-|--use-docker-for-pt| /usr/bin/pt-query-digestの代わりに yoku0825/percona-toolkit のDockerイメージをを使う|0|
+|--pt-query-digest=s| pt-query-digestのパスを指定する。/usr/bin/pt-query-digest 以外のパスにある場合に指定|/usr/bin/pt-query-digest|
+|--use-docker-for-pt| --pt-query-digestで指定されたファイルの代わりに yoku0825/percona-toolkit のDockerイメージをを使う|0|
 |--type=s     |入力ファイルとして利用するファイルの種類を指定する。サポートしているファイルの種類はslowlog、binlog、tcpdump|slowlog              |
 
 
