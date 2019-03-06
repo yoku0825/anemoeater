@@ -2,6 +2,12 @@
 
 anemo **eat** erは [box/Anemometer](https://github.com/box/Anemometer) をdockerコンテナーとして起動して、[percona-toolkit](https://github.com/percona/percona-toolkit)の`pt-query-digest`の結果を食わせるためのラッパースクリプトです。
 
+## 注意
+
+- pt-query-digestの仕様変更により、percona-toolkit 3.0.11とそれ以降のpt-query-digestでは本家 box/Anemometer が動きません。 `--pt-query-digest=/path/to/pt-query-digest` で3.0.10とそれ以前のpt-query-digestを指定するか、 `--use-docker-for-pt` でコンテナ版のpt-query-digestを使うようにしてください。
+  - [pt\-query\-digest 3\.0\.11 changed \`checksum\` from BIGINT UNSIGNED to CHAR\(32\) · Issue \#200 · box/Anemometer](https://github.com/box/Anemometer/issues/200)
+  - box/Anemometer 本家が直してくれれば一番いいんですが…はてさて。
+
 ## クイックスタート
 
 * dockerとpercona-toolkitがインストールされている必要があります。
