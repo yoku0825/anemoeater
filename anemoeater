@@ -110,7 +110,7 @@ if ($opt->{docker})
   if ($opt->{local})
   {
     $repository= "anemoeater";
-    system("sudo docker build -t anemoeater $Bin");
+    system("sudo docker build -t anemoeater -f $Bin/Dockerfile/Anemometer-Server .");
   }
   else
   {
