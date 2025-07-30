@@ -1,3 +1,8 @@
+# anemonext
+
+anemoeaterはメンテナンスされません。後継にanemonextというのを作りました。
+[yoku0825/anemonext: MySQL Slow\-log graphize tool\. Succesor of Anemometer and anemoeater](https://github.com/yoku0825/anemonext)
+
 # anemoeater
 
 anemo **eat** erは [box/Anemometer](https://github.com/box/Anemometer) をdockerコンテナーとして起動して、[percona-toolkit](https://github.com/percona/percona-toolkit)の`pt-query-digest`の結果を食わせるためのラッパースクリプトです。
